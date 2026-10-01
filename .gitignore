@@ -1,0 +1,25 @@
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment variables / secrets
+.env
+
+# Trained models
+models/*.pkl
+models/*.joblib
+
+# Ignore all dataset files
+data/
+
+# VS Code
+.vscode/
+
+# Trained transformer models
+models/*
