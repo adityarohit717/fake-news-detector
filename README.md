@@ -1,63 +1,71 @@
 # Fake News Detector
 
-An NLP-based fake news detection system built using **DistilBERT**, **PyTorch**, and **FastAPI**.
+An NLP-based fake news classification system built with **DistilBERT**, **PyTorch**, **FastAPI**, and a lightweight web frontend.
 
-The system accepts a news headline or article text and predicts whether the text resembles **FAKE**, **REAL**, or **UNCERTAIN** based on the model's confidence.
+The system analyzes news text and classifies it as:
 
-> **Important:** This is a text classifier, not a fact-checking system. It does not independently verify whether a claim is true or false.
+- **FAKE**
+- **REAL**
+- **UNCERTAIN**
+
+> **Important:** This is a text-style classifier, not a fact-checking system. It does not independently verify whether a claim is true.
+
+---
+
+## Demo
+
+![Fake News Detector Demo](frontend-demo.png)
 
 ---
 
 ## Features
 
 - DistilBERT-based text classification
-- FAKE / REAL / UNCERTAIN predictions
+- FAKE / REAL / UNCERTAIN prediction
 - Confidence score
 - Fake and real probability scores
-- Configurable confidence threshold
-- CPU inference support
-- Dynamic INT8 CPU benchmarking
+- Inference latency measurement
+- 5,000-character input limit
+- 128-token model input limit
 - FastAPI REST API
 - Browser-based frontend
-- Input validation
-- Inference latency reporting
-- Automated API tests with pytest
-- Evaluation on held-out and source-specific datasets
+- CPU inference support
+- Dynamic INT8 CPU benchmarking
+- Automated pytest test suite
+- GitHub Actions CI
+- Model kept outside the Git repository
 
 ---
 
 ## System Architecture
 
 ```text
-User
- │
- ▼
-Frontend (HTML/CSS/JavaScript)
- │
- ▼
-FastAPI
- │
- ▼
-Input Validation
- │
- ▼
-DistilBERT Tokenizer
- │
- ▼
-DistilBERT Classification Model
- │
- ▼
-Softmax Probabilities
- │
- ├── Fake Probability
- └── Real Probability
- │
- ▼
-Confidence Threshold
- │
- ├── FAKE
- ├── REAL
- └── UNCERTAIN
- │
- ▼
-JSON Response / Frontend Result
+                    ┌─────────────────────┐
+                    │     Web Frontend    │
+                    │      index.html     │
+                    └──────────┬──────────┘
+                               │
+                               │ POST /predict
+                               ▼
+                    ┌─────────────────────┐
+                    │       FastAPI       │
+                    │      src/app.py     │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │      Tokenizer      │
+                    │     DistilBERT      │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │   Classification    │
+                    │      Model          │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+             ┌──────────────────────────────────┐
+             │ FAKE / REAL / UNCERTAIN          │
+             │ Probability + Confidence + ms    │
+             └──────────────────────────────────┘
