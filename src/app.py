@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -28,8 +29,12 @@ log = logging.getLogger("fakenews")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-MODEL_DIR = PROJECT_ROOT / "models" / "distilbert-final"
+LOCAL_MODEL_DIR = PROJECT_ROOT / "models" / "distilbert-final"
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
+
+
+# Hugging Face model repository
+HF_MODEL_ID = "adityakumarrohit/fake-news-detector-distilbert"
 
 
 # ============================================================
@@ -55,36 +60,52 @@ if device.type == "cpu":
 
 
 # ============================================================
-# Model
+# Select model source
+# ============================================================
+
+if LOCAL_MODEL_DIR.exists():
+    MODEL_SOURCE = LOCAL_MODEL_DIR
+    log.info(
+        "Local model found. Loading from: %s",
+        LOCAL_MODEL_DIR,
+    )
+else:
+    MODEL_SOURCE = HF_MODEL_ID
+    log.info(
+        "Local model not found. Loading from Hugging Face: %s",
+        HF_MODEL_ID,
+    )
+
+
+# ============================================================
+# Load tokenizer and model
 # ============================================================
 
 tokenizer = None
 model = None
 
+try:
 
-if MODEL_DIR.exists():
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_SOURCE
+    )
 
-        model = AutoModelForSequenceClassification.from_pretrained(
-            MODEL_DIR
-        )
+    model = AutoModelForSequenceClassification.from_pretrained(
+        MODEL_SOURCE
+    )
 
-        model.to(device)
-        model.eval()
+    model.to(device)
+    model.eval()
 
-        log.info(
-            "Model loaded successfully from %s",
-            MODEL_DIR,
-        )
+    log.info(
+        "Model loaded successfully. Device: %s",
+        device,
+    )
 
-    except Exception:
-        log.exception("Failed to load model")
-
-else:
-    log.warning(
-        "Model directory not found: %s",
-        MODEL_DIR,
+except Exception:
+    log.exception(
+        "Failed to load model from %s",
+        MODEL_SOURCE,
     )
 
 
@@ -93,17 +114,10 @@ else:
 # ============================================================
 
 def run_model(text: str):
-    """
-    Run fake-news classification.
-
-    The real DistilBERT model is used when the model directory
-    exists. Tests can replace this function with a mock model.
-    """
 
     if tokenizer is None or model is None:
         raise RuntimeError(
-            "Model is not available. "
-            "Please make sure models/distilbert-final exists."
+            "Model is not available."
         )
 
     inputs = tokenizer(
@@ -119,7 +133,10 @@ def run_model(text: str):
     }
 
     with torch.inference_mode():
-        logits = model(**inputs).logits
+
+        logits = model(
+            **inputs
+        ).logits
 
     probabilities = torch.softmax(
         logits,
@@ -135,7 +152,7 @@ def run_model(text: str):
 
 app = FastAPI(
     title="Fake News Detection API",
-    version="1.1.0",
+    version="1.2.0",
     description=(
         "NLP-based fake news classification API "
         "using DistilBERT."
@@ -173,35 +190,38 @@ class NewsRequest(BaseModel):
     include_in_schema=False,
 )
 def index():
-    """
-    Serve the browser frontend.
-    """
 
     frontend_file = FRONTEND_DIR / "index.html"
 
     if not frontend_file.exists():
+
         raise HTTPException(
             status_code=404,
             detail="Frontend not found",
         )
 
-    return FileResponse(frontend_file)
+    return FileResponse(
+        frontend_file
+    )
 
 
 # ============================================================
-# Health endpoint
+# Health
 # ============================================================
 
 @app.get("/health")
 def health():
-    """
-    Return API and model configuration information.
-    """
 
     return {
         "status": "ok",
         "device": str(device),
         "model_loaded": model is not None,
+        "model_source": (
+            "local"
+            if LOCAL_MODEL_DIR.exists()
+            else "huggingface"
+        ),
+        "model_id": HF_MODEL_ID,
         "threshold": THRESHOLD,
         "max_tokens": MAX_LENGTH,
         "max_chars": MAX_CHARS,
@@ -209,32 +229,27 @@ def health():
 
 
 # ============================================================
-# Prediction endpoint
+# Prediction
 # ============================================================
 
 @app.post("/predict")
 def predict(request: NewsRequest):
-    """
-    Classify submitted news text as:
-
-    FAKE
-    REAL
-    UNCERTAIN
-    """
 
     text = request.text.strip()
 
     # --------------------------------------------------------
-    # Validate input
+    # Input validation
     # --------------------------------------------------------
 
     if not text:
+
         raise HTTPException(
             status_code=400,
             detail="Text cannot be empty",
         )
 
     if len(text) > MAX_CHARS:
+
         raise HTTPException(
             status_code=413,
             detail=(
@@ -244,24 +259,31 @@ def predict(request: NewsRequest):
         )
 
     # --------------------------------------------------------
-    # Run inference
+    # Model availability
     # --------------------------------------------------------
 
-    start = time.perf_counter()
-
-    try:
-        probabilities = run_model(text)
-
-    except RuntimeError as exc:
-        log.error("Model unavailable: %s", exc)
+    if tokenizer is None or model is None:
 
         raise HTTPException(
             status_code=503,
             detail="Model is not available",
         )
 
+    # --------------------------------------------------------
+    # Inference
+    # --------------------------------------------------------
+
+    start = time.perf_counter()
+
+    try:
+
+        probabilities = run_model(text)
+
     except Exception:
-        log.exception("Inference failed")
+
+        log.exception(
+            "Inference failed"
+        )
 
         raise HTTPException(
             status_code=500,
@@ -269,7 +291,7 @@ def predict(request: NewsRequest):
         )
 
     # --------------------------------------------------------
-    # Extract probabilities
+    # Probabilities
     # --------------------------------------------------------
 
     fake_probability = probabilities[0].item()
