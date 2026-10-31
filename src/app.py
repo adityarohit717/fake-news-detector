@@ -75,7 +75,10 @@ else:
         "Local model not found. Loading from Hugging Face: %s",
         HF_MODEL_ID,
     )
+MODEL_LOAD_KWARGS = {}
 
+if not LOCAL_MODEL_DIR.exists():
+    MODEL_LOAD_KWARGS["subfolder"] = "distilbert-final"
 
 # ============================================================
 # Load tokenizer and model
@@ -87,11 +90,13 @@ model = None
 try:
 
     tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_SOURCE
+        MODEL_SOURCE,
+        **MODEL_LOAD_KWARGS
     )
 
     model = AutoModelForSequenceClassification.from_pretrained(
-        MODEL_SOURCE
+        MODEL_SOURCE,
+        **MODEL_LOAD_KWARGS
     )
 
     model.to(device)
