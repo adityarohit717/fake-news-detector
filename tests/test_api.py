@@ -9,14 +9,25 @@ client = TestClient(app)
 
 GOOD = "The government announced a new policy affecting millions of citizens."
 
-
 @pytest.fixture(autouse=True)
 def mock_model(monkeypatch):
+
+    import src.app
+
+    # Simulate a loaded model and tokenizer.
+    # Actual inference is mocked below.
+    monkeypatch.setattr(src.app, "tokenizer", object())
+    monkeypatch.setattr(src.app, "model", object())
+
+    # Return deterministic probabilities.
     def fake_run_model(text):
-        # Deterministic fake probabilities for CI testing.
         return torch.tensor([0.30, 0.70])
 
-    monkeypatch.setattr("src.app.run_model", fake_run_model)
+    monkeypatch.setattr(
+        src.app,
+        "run_model",
+        fake_run_model
+    )
 
 
 def test_health():
