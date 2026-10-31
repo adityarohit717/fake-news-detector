@@ -23,3 +23,7 @@ data/
 
 # Trained transformer models
 models/*
+
+# Python virtual environments
+.venv/
+.venv311/
